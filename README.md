@@ -32,18 +32,19 @@ curl http://localhost:8000/users
 graph TB
     %% Client Layer
     subgraph CLIENT ["🌐 CLIENT LAYER"]
-        HTTP["HTTP Requests<br/>GET /users<br/>POST /users<br/>PUT /users/:email<br/>POST /users/:email/rollback"]
+        HTTP["HTTP Requests<br/>GET /health<br/>GET /users<br/>POST /users<br/>PUT /users/:email<br/>POST /users/:email/rollback"]
     end
 
     %% Presentation Layer
     subgraph PRESENTATION ["📡 PRESENTATION LAYER"]
-        APP["Express App<br/>(index.ts)"]
+        APP["Express App<br/>(index.ts)<br/>+ Pino Logger"]
         ROUTES["Routes Handler<br/>(routes.ts)"]
     end
 
     %% Use Case Layer (Refactored)
     subgraph USECASE ["🎯 USE CASE LAYER"]
         USERSUSECASES["UsersUseCases Class<br/>• createUser()<br/>• updateUser()<br/>• listUsers()<br/>• rollbackUser()"]
+        SNAPSUSECASES["SnapshotsUseCases Class<br/>• createSnapshot()<br/>• getSnapshot()"]
         USECASEINSTANCE["Singleton Instance<br/>(use-case/users/index.ts)"]
     end
 
@@ -51,19 +52,20 @@ graph TB
     subgraph REPOSITORY ["🗄️ REPOSITORY LAYER"]
         USERREPOINTF["UsersRepository<br/>Interface"]
         USERREPO["UsersRepositoryInMemory<br/>(Implementation)"]
-        SNAPREPO["SnapshotRepositoryInMemory<br/>(Implements SnapshotRepository)"]
+        SNAPREPOINTF["SnapshotRepository<br/>Interface"]
+        SNAPREPO["SnapshotRepositoryInMemoryImpl<br/>(Implementation)"]
     end
 
     %% Entity Layer
     subgraph ENTITY ["📊 ENTITY LAYER"]
-        USER["User Entity<br/>{name, email}"]
-        SNAPSHOT["Snapshot Entity<br/>{entity_id, entity, data}"]
+        USER["User Interface<br/>{name: string, email: string}"]
+        SNAPSHOT["Snapshot Interface<br/>{entity_id: string, entity: string, data: string}"]
     end
 
     %% Data Storage
     subgraph STORAGE ["💾 DATA STORAGE"]
-        USERMAP["In-Memory Map<br/>User Storage<br/>+ Duplicate Prevention"]
-        SNAPMAP["In-Memory Map<br/>Snapshot Storage"]
+        USERMAP["In-Memory Map<string, User><br/>User Storage<br/>+ Duplicate Prevention"]
+        SNAPMAP["In-Memory Map<string, Snapshot><br/>Snapshot Storage<br/>Key: 'entity@entity_id'"]
     end
 
     %% Communication Flow
@@ -75,8 +77,11 @@ graph TB
     
     USERSUSECASES --> USERREPOINTF
     USERREPOINTF --> USERREPO
+    
+    USERSUSECASES --> SNAPSUSECASES
+    SNAPSUSECASES --> SNAPREPOINTF
+    SNAPREPOINTF --> SNAPREPO
 
-    USERREPO --> SNAPREPO
     USERREPO --> USER
     SNAPREPO --> SNAPSHOT
 
@@ -85,9 +90,12 @@ graph TB
 
     %% Dependency Injection
     USECASEINSTANCE -.->|"Dependency Injection"| USERREPO
+    USERSUSECASES -.->|"Composition"| SNAPSUSECASES
+    SNAPSUSECASES -.->|"Dependency Injection"| SNAPREPO
 
     %% Enhanced Features
     USERREPO -.->|"Duplicate Check"| USERMAP
+    SNAPREPO -.->|"Composite Key Storage"| SNAPMAP
 
     %% Styling for high contrast
     classDef clientStyle fill:#000000,stroke:#ffffff,stroke-width:3px,color:#ffffff
@@ -99,8 +107,8 @@ graph TB
 
     class HTTP clientStyle
     class APP,ROUTES presentationStyle
-    class USERSUSECASES,USECASEINSTANCE usecaseStyle
-    class USERREPOINTF,USERREPO,SNAPREPO repositoryStyle
+    class USERSUSECASES,SNAPSUSECASES,USECASEINSTANCE usecaseStyle
+    class USERREPOINTF,USERREPO,SNAPREPOINTF,SNAPREPO repositoryStyle
     class USER,SNAPSHOT entityStyle
     class USERMAP,SNAPMAP storageStyle
 ```
